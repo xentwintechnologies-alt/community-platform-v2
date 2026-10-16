@@ -132,3 +132,4 @@ sockets, so the "advanced real-time" surface hasn't grown.
 - Staff Settings/profile page (not in the original nav; the student Profile page pattern can
   be copied if needed)
 - No automated test suite (manual checklist only, in `docs/TESTING.md`)
+# community-platform-v2

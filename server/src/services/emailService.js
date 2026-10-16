@@ -1,4 +1,3 @@
-
 const clientUrl = () =>
   String(process.env.CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
 
@@ -11,34 +10,55 @@ const esc = (s) =>
     "'": "&#39;",
   }[c]));
 
-async function deliver({ to, subject, text, html, link }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "Community Platform <onboarding@resend.dev>";
+// Accepts EMAIL_FROM as plain "me@gmail.com" or "Name <me@gmail.com>"
+function getSender() {
+  const raw = String(process.env.EMAIL_FROM || "").trim();
+  const match = raw.match(/^(.*)<(.+)>$/);
 
-  if (!apiKey) {
+  if (match) {
+    return {
+      name: match[1].trim().replace(/^"|"$/g, "") || "Community Platform",
+      email: match[2].trim(),
+    };
+  }
+
+  return {
+    name: process.env.EMAIL_FROM_NAME || "Community Platform",
+    email: raw,
+  };
+}
+
+async function deliver({ to, subject, text, html, link }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const sender = getSender();
+
+  if (!apiKey || !sender.email) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("Email is not configured: RESEND_API_KEY is missing");
+      throw new Error(
+        "Email is not configured: BREVO_API_KEY or EMAIL_FROM is missing"
+      );
     }
 
     console.log(
-      `\n[DEV EMAIL - Resend not configured]\nTo: ${to}\nSubject: ${subject}\nLink: ${link}\n`
+      `\n[DEV EMAIL - Brevo not configured]\nTo: ${to}\nSubject: ${subject}\nLink: ${link}\n`
     );
     return;
   }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "api-key": apiKey,
         "Content-Type": "application/json",
+        accept: "application/json",
       },
       body: JSON.stringify({
-        from,
-        to: [to],
+        sender,
+        to: [{ email: to }],
         subject,
-        text,
-        html,
+        textContent: text,
+        htmlContent: html,
       }),
     });
 
@@ -46,12 +66,12 @@ async function deliver({ to, subject, text, html, link }) {
 
     if (!response.ok) {
       const message =
-        result.message || result.name || `HTTP ${response.status}`;
+        result.message || result.code || `HTTP ${response.status}`;
       console.error("[EMAIL FAILED]", response.status, message);
-      throw new Error(`Resend email failed: ${message}`);
+      throw new Error(`Brevo email failed: ${message}`);
     }
 
-    console.log(`[EMAIL SENT] to=${to} id=${result.id}`);
+    console.log(`[EMAIL SENT] to=${to} id=${result.messageId}`);
   } catch (err) {
     console.error("[EMAIL FAILED]", err.message);
 
@@ -73,6 +93,7 @@ function layout(title, intro, buttonLabel, link, footer) {
       <a href="${link}" style="display:inline-block;background:#1fb6e8;color:#04202e;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px;font-size:14px;">${buttonLabel}</a>
       <p style="color:#7a859c;font-size:12px;line-height:1.6;margin:22px 0 0;">If the button does not work, copy this link into your browser:<br><span style="word-break:break-all;">${link}</span></p>
       <p style="color:#7a859c;font-size:12px;line-height:1.6;margin:14px 0 0;">${footer}</p>
+      <p style="color:#7a859c;font-size:12px;line-height:1.6;margin:14px 0 0;">Can't find this email? Check your Spam folder.</p>
     </div>
   </div></body></html>`;
 }

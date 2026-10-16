@@ -23,7 +23,7 @@ const xentieRoutes = require("./routes/xentieRoutes");
 
 const app = express();
 
-// Allowed frontend websites
+// Allowed frontend origins
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "https://community-platform-v2.pages.dev",
@@ -31,18 +31,25 @@ const allowedOrigins = [
   "http://localhost:5173",
 ].filter(Boolean);
 
-// CORS: allow requests from the configured frontend websites
+// Allow production and preview deployments on Cloudflare Pages
 app.use(
   cors({
     origin: function (origin, callback) {
-      const isVercelOrigin =
+      const isCloudflarePagesPreview =
+        typeof origin === "string" &&
+        /^https:\/\/[a-z0-9-]+\.community-platform-v2\.pages\.dev$/i.test(
+          origin
+        );
+
+      const isVercelPreview =
         typeof origin === "string" &&
         /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
 
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        isVercelOrigin
+        isCloudflarePagesPreview ||
+        isVercelPreview
       ) {
         return callback(null, true);
       }
@@ -56,7 +63,7 @@ app.use(
   })
 );
 
-// Request body parsing
+// Parse JSON request bodies
 app.use(express.json({ limit: "2mb" }));
 
 // Health check
@@ -70,7 +77,7 @@ app.get("/api/health", (req, res) => {
 // Authentication
 app.use("/api/auth", authRoutes);
 
-// Opportunities and registrations
+// Opportunities
 app.use("/api/internships", internshipRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/workshops", workshopRoutes);
@@ -78,7 +85,7 @@ app.use("/api/events", eventRoutes);
 app.use("/api/hackathons", hackathonRoutes);
 app.use("/api/opportunities", opportunityRoutes);
 
-// Platform content
+// Announcements and comments
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/comments", commentRoutes);
 
